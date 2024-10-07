@@ -22,7 +22,7 @@ int main( int argc, const char** argv )
     char key = 0;
 
     cascadeName = "haarcascade_frontalface_default.xml";
-    scale = 1; // usar 1, 2, 4.
+    scale = 2; // usar 1, 2, 4.
     if (scale < 1)
         scale = 1;
     tryflip = true;
@@ -32,8 +32,8 @@ int main( int argc, const char** argv )
         return -1;
     }
 
-    //if(!capture.open("video.mp4")) // para testar com um video
-    if(!capture.open(0)) // para testar com a webcam
+    if(!capture.open("video.mp4")) // para testar com um video
+    //if(!capture.open(0)) // para testar com a webcam
     {
         cout << "Capture from camera #0 didn't work" << endl;
         return 1;
@@ -56,8 +56,8 @@ int main( int argc, const char** argv )
             key = (char)waitKey(10);
             if( key == 27 || key == 'q' || key == 'Q' )
                 break;
-            //if (getWindowProperty(wName, WND_PROP_VISIBLE) == 1)
-                //break;
+            if (getWindowProperty(wName, WND_PROP_VISIBLE) == 1)
+                break;
         }
     }
 
