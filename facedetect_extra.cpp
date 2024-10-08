@@ -27,6 +27,8 @@ Mat comidaImage2;  // Imagem da comida2
 Point snakePos(100, 100);
 Point comida; //
 Point comida2; // posição da comida
+Point chaserPos(20, 20); // Posição inicial do perseguidor
+int chaserSpeed = 2; // Velocidade do perseguidor
 
 // Função para salvar a pontuação
 void Arquivo(int pontuacao) {
@@ -60,6 +62,7 @@ void ReiniciarGame() {
     jaSalvo = false;
     comida = Point(rand() % 30 * blockSize, rand() % 20 * blockSize);  // Gera a posição da primeira comida
     comida2 = Point(rand() % 30 * blockSize, rand() % 20 * blockSize); // Gera a posição da segunda comida
+    chaserPos = Point(20, 20); // Reinicia a posição do perseguidor
 }
 
 // Desenha a comida com uma imagem PNG
@@ -118,6 +121,14 @@ void drawSnake(Mat& frame) {
     }
 }
 
+// Função para desenhar o perseguidor
+void drawChaser(Mat& frame) {
+    Scalar chaserColor(0, 0, 255); // Cor vermelha para o perseguidor
+    Point chaserTopLeft(chaserPos.x, chaserPos.y);
+    Point chaserBottomRight(chaserPos.x + blockSize, chaserPos.y + blockSize);
+    rectangle(frame, chaserTopLeft, chaserBottomRight, chaserColor, -1); // Desenha o perseguidor
+}
+
 // Atualiza a posição da cobra com base na detecção do rosto
 void updateGame(Point faceCenter) {
     // Atualiza a posição da cabeça da cobra
@@ -136,8 +147,31 @@ void updateGame(Point faceCenter) {
     }
 }
 
+// Atualiza a posição do perseguidor
+void updateChaser() {
+    // Move o perseguidor em direção à cobra
+    if (chaserPos.x < snakePos.x) {
+        chaserPos.x += chaserSpeed; // Move para a direita
+    } else if (chaserPos.x > snakePos.x) {
+        chaserPos.x -= chaserSpeed; // Move para a esquerda
+    }
+
+    if (chaserPos.y < snakePos.y) {
+        chaserPos.y += chaserSpeed; // Move para baixo
+    } else if (chaserPos.y > snakePos.y) {
+        chaserPos.y -= chaserSpeed; // Move para cima
+    }
+
+    // Verifica se o perseguidor alcançou a cobrinha
+    if (abs(chaserPos.x - snakePos.x) < blockSize && abs(chaserPos.y - snakePos.y) < blockSize) {
+        cout << "Game Over! O perseguidor alcançou a cobrinha." << endl;
+        Arquivo(pontuacao); // Salva a pontuação
+        exit(0); // Encerra o jogo
+    }
+}
 
 int main(int argc, const char** argv) {
+    srand(time(0));
     VideoCapture capture;
     Mat frame;
     CascadeClassifier faceCascade;
@@ -162,11 +196,12 @@ int main(int argc, const char** argv) {
         cout << "ERROR: Could not load food image." << endl;
         return -1;
     }
+
     comidaImage2 = imread("comida2.png", IMREAD_UNCHANGED);  
-if (comidaImage2.empty()) {
-    cout << "ERROR: Could not load second food image." << endl;
-    return -1;
-}
+    if (comidaImage2.empty()) {
+        cout << "ERROR: Could not load second food image." << endl;
+        return -1;
+    }
 
     // Carrega a imagem de plano de fundo
     background = imread("background.jpg", IMREAD_COLOR);
@@ -178,17 +213,12 @@ if (comidaImage2.empty()) {
     int windowHeight = 480; // Altere conforme necessário
     resize(background, background, Size(windowWidth, windowHeight));  // Redimensiona o plano de fundo
 
-    //resize(background, background, Size(640, 480));
-
     if (!capture.open(0)) {
         cout << "Capture from camera #0 didn't work" << endl;
         return 1;
     }
     capture.set(CAP_PROP_FRAME_WIDTH, windowWidth);  // Define a largura da captura de vídeo
     capture.set(CAP_PROP_FRAME_HEIGHT, windowHeight); // Define a altura da captura de vídeo
-
-    //capture.set(CAP_PROP_FRAME_WIDTH, 640);
-    //capture.set(CAP_PROP_FRAME_HEIGHT, 480);
 
     ReiniciarGame();
 
@@ -212,17 +242,29 @@ if (comidaImage2.empty()) {
             updateGame(faceCenter);
         }
 
+        // Atualiza a posição do perseguidor
+        updateChaser();
+
         // Copia a imagem de fundo para exibição
         Mat displayFrame = background.clone();
 
-        // Desenha a "cobra" (imagem da cabeça) e a comida no plano de fundo
+        // Desenha a "cobra" (imagem da cabeça), a comida e o perseguidor no plano de fundo
         drawSnake(displayFrame);
         drawFood(displayFrame);
+        drawChaser(displayFrame);
 
         // Exibe o placar
         putText(displayFrame, "Placar: " + to_string(pontuacao), Point(430,470 ), FONT_HERSHEY_SIMPLEX, 1, Scalar(128, 0, 128), 2);
 
-        // Exibe o frame com a cobra e comida
+        // Desenha retângulos ao redor dos rostos detectados
+        for (size_t i = 0; i < faces.size(); i++) {
+            Rect r = faces[i];
+            rectangle(frame, Point(cvRound(r.x), cvRound(r.y)),
+                      Point(cvRound((r.x + r.width - 1)), cvRound((r.y + r.height - 1))),
+                      Scalar(255, 0, 0), 3); // Desenha um retângulo azul
+        }
+
+        // Exibe o frame com a cobra, comida e perseguidor
         imshow("Snake Game", displayFrame);
 
         char key = (char)waitKey(30);
