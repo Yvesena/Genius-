@@ -16,43 +16,46 @@ using namespace std;
 using namespace cv;
 
 bool jaSalvo = false;
-int blockSize = 20;
+int blockSize= 20;  // estava 20 o tamanho;
 int pontuacao = 0;
 Mat cobrinha;     // imagem da cobrinha
 Mat background;   // Plano de fundo
 Mat comidaImage;  //Imagem de comida
-Mat comidaImage2;  // Imagem da comida2
+Mat comidaImage2;
+Mat chaser;  // Imagem da comida2
+char key = 0;
 
 // Posição da "cobrinha" e da comida
 Point snakePos(100, 100);
 Point comida; //
 Point comida2; // posição da comida
 Point chaserPos(20, 20); // Posição inicial do perseguidor
-int chaserSpeed = 2; // Velocidade do perseguidor
+int chaserSpeed = 3; // Velocidade do perseguidor
 
 // Função para salvar a pontuação
 void Arquivo(int pontuacao) {
     fstream file;
-    string linha;
+    int maiorPontuacao = 0;
+
+    // Abre o arquivo e lê a maior pontuação existente
     file.open("tabela_de_pontuacoes.txt", ios::in);
     if (file.is_open()) {
-        while (getline(file, linha)) {
-            if (to_string(pontuacao) == linha) {
-                jaSalvo = true;
-                break;
-            }
-        }
+        file >> maiorPontuacao;  // Lê a maior pontuação do arquivo
         file.close();
     }
-    if (!jaSalvo) {
-        file.open("tabela_de_pontuacoes.txt", ios::app);
+
+    // Se a pontuação atual for maior que a salva, atualiza o arquivo
+    if (pontuacao > maiorPontuacao) {
+        file.open("tabela_de_pontuacoes.txt", ios::out);  // Abre o arquivo para escrita
         if (!file) {
-            cout << "Erro" << endl;
+            cout << "Erro ao abrir o arquivo para salvar a pontuação." << endl;
         } else {
-            file << pontuacao << endl;
-            cout << "Pontuação salva" << endl;
+            file << pontuacao;  // Salva a nova maior pontuação
+            cout << "Nova maior pontuação salva: " << pontuacao << endl;
             file.close();
         }
+    } else {
+        cout << "A pontuação atual não é maior que a salva: " << maiorPontuacao << endl;
     }
 }
 
@@ -70,7 +73,7 @@ void drawFood(Mat& frame) {
     // Desenha a primeira comida
     if (!comidaImage.empty()) {
         Mat mask, comidaResized;
-        int foodSize = blockSize * 2;
+        int foodSize = blockSize * 3;
         resize(comidaImage, comidaResized, Size(foodSize, foodSize));
         vector<Mat> layers;
         split(comidaResized, layers);
@@ -87,7 +90,7 @@ void drawFood(Mat& frame) {
     // Desenha a segunda comida
     if (!comidaImage2.empty()) {
         Mat mask, comidaResized2;
-        int foodSize2 = blockSize * 2;
+        int foodSize2 = blockSize * 3;
         resize(comidaImage2, comidaResized2, Size(foodSize2, foodSize2));
         vector<Mat> layers2;
         split(comidaResized2, layers2);
@@ -106,7 +109,7 @@ void drawFood(Mat& frame) {
 void drawSnake(Mat& frame) {
     if (!cobrinha.empty()) {
         Mat mask, snakeResized;
-        int snakeSize = blockSize * 2; // Tamanho constante da cobra
+        int snakeSize = blockSize * 4 ; // Tamanho constante da cobra
         resize(cobrinha, snakeResized, Size(snakeSize, snakeSize)); // Ajusta o tamanho da cobra
         vector<Mat> layers;
         split(snakeResized, layers);  // Separa os canais de cor
@@ -115,33 +118,75 @@ void drawSnake(Mat& frame) {
             mask = layers[3];         // Canal alfa (transparência)
             merge(rgb, 3, snakeResized);  // Junta os canais RGB
             snakeResized.copyTo(frame(Rect(snakePos.x, snakePos.y, snakeResized.cols, snakeResized.rows)), mask);
+            //resize(cobrinha, cobrinha, Size(200, 200));
         } else {
             snakeResized.copyTo(frame(Rect(snakePos.x, snakePos.y, snakeResized.cols, snakeResized.rows)));
+            
         }
     }
 }
 
 // Função para desenhar o perseguidor
+//void drawChaser(Mat& frame) {
+    // Função para desenhar o perseguidor com imagem PNG
 void drawChaser(Mat& frame) {
-    Scalar chaserColor(0, 0, 255); // Cor vermelha para o perseguidor
-    Point chaserTopLeft(chaserPos.x, chaserPos.y);
-    Point chaserBottomRight(chaserPos.x + blockSize, chaserPos.y + blockSize);
-    rectangle(frame, chaserTopLeft, chaserBottomRight, chaserColor, -1); // Desenha o perseguidor
+    if (!chaser.empty()) {
+        Mat mask, chaserResized;
+        int chaserSize = blockSize * 4;  // Ajuste o tamanho conforme necessário
+        resize(chaser, chaserResized, Size(chaserSize, chaserSize));
+        vector<Mat> layers;
+        split(chaserResized, layers);
+
+        // Verifica se a imagem possui um canal alfa (transparência)
+        if (layers.size() == 4) {
+            Mat rgb[3] = {layers[0], layers[1], layers[2]};
+            mask = layers[3];  // Canal alfa
+            merge(rgb, 3, chaserResized);
+            chaserResized.copyTo(frame(Rect(chaserPos.x, chaserPos.y, chaserResized.cols, chaserResized.rows)), mask);
+        } else {
+            chaserResized.copyTo(frame(Rect(chaserPos.x, chaserPos.y, chaserResized.cols, chaserResized.rows)));
+        }
+    }
 }
+
+
+    
+
+   /* if(!chaser.empty())
+    Mat mask, chaserResized;
+    int chaserSize = blockSize * 4;
+    resize(chaser, chaserResized, Size(chaserSize,  chaserSize));
+    vector<Mat> layers;
+    split(chaserResized, layers);
+    if(layers.size() == 4){
+        Mat rgb[3] ={layers[0], layers[1], layers[2]};
+        mask =layers[3];
+        merge(rgb, 3, chaserResized);
+        chaserResized.copyTo(frame(Rect(chaserPos.x, chaserPos.y, chaserResized.cols, chaserResized.rows)), mask);
+    }else {
+        chaserResized.copyTo(frame(Rect(chaserPos.x, chaserPos.y, chaserResized.cols, chaserResized.rows)));
+    }
+    */
+    
+    //Scalar chaserColor(0, 0, 255); // Cor vermelha para o perseguidor
+    //Point chaserTopLeft(chaserPos.x, chaserPos.y);
+    //Point chaserBottomRight(chaserPos.x + blockSize, chaserPos.y + blockSize);
+    //rectangle(frame, chaserTopLeft, chaserBottomRight, chaserColor, -1); // Desenha o perseguidor
+//}
 
 // Atualiza a posição da cobra com base na detecção do rosto
 void updateGame(Point faceCenter) {
     // Atualiza a posição da cabeça da cobra
-    snakePos = Point(faceCenter.x - blockSize, faceCenter.y - blockSize);
+    snakePos = Point(faceCenter.x - blockSize, faceCenter.y - blockSize );
 
     // Verifica se comeu a primeira comida
-    if (abs(snakePos.x - comida.x) < blockSize && abs(snakePos.y - comida.y) < blockSize) {
+    if (abs(snakePos.x - comida.x) < blockSize * 3 && abs(snakePos.y - comida.y) < blockSize * 3) {
         pontuacao += 10;
         comida = Point(rand() % 30 * blockSize, rand() % 20 * blockSize); // Gera nova posição para a primeira comida
     }
 
     // Verifica se comeu a segunda comida
-    if (abs(snakePos.x - comida2.x) < blockSize && abs(snakePos.y - comida2.y) < blockSize) {
+    if (abs(snakePos.x - comida2.x) < blockSize * 3 && abs(snakePos.y - comida2.y) < blockSize * 3) {
         pontuacao += 10;
         comida2 = Point(rand() % 30 * blockSize, rand() % 20 * blockSize); // Gera nova posição para a segunda comida
     }
@@ -162,12 +207,13 @@ void updateChaser() {
         chaserPos.y -= chaserSpeed; // Move para cima
     }
 
-    // Verifica se o perseguidor alcançou a cobrinha
-    if (abs(chaserPos.x - snakePos.x) < blockSize && abs(chaserPos.y - snakePos.y) < blockSize) {
+    // Verifica se o perseguidor alcançou a cobrinha  
+           if (abs(chaserPos.x - snakePos.x) < blockSize * 1.5 && abs(chaserPos.y - snakePos.y) < blockSize * 1.5 ) {
         cout << "Game Over! O perseguidor alcançou a cobrinha." << endl;
         Arquivo(pontuacao); // Salva a pontuação
         exit(0); // Encerra o jogo
     }
+
 }
 
 int main(int argc, const char** argv) {
@@ -176,6 +222,13 @@ int main(int argc, const char** argv) {
     Mat frame;
     CascadeClassifier faceCascade;
     string faceCascadeName = "haarcascade_frontalface_default.xml";
+
+    // Carrega a imagem do perseguidor
+    chaser = imread("chaser.png", IMREAD_UNCHANGED);
+    if (chaser.empty()) {
+    cout << "ERROR: Could not load chaser image." << endl;
+    return -1;
+    }
 
     // Carrega o Haar Cascade para detecção de rostos
     if (!faceCascade.load(faceCascadeName)) {
@@ -213,12 +266,15 @@ int main(int argc, const char** argv) {
     int windowHeight = 480; // Altere conforme necessário
     resize(background, background, Size(windowWidth, windowHeight));  // Redimensiona o plano de fundo
 
+    
     if (!capture.open(0)) {
         cout << "Capture from camera #0 didn't work" << endl;
         return 1;
     }
-    capture.set(CAP_PROP_FRAME_WIDTH, windowWidth);  // Define a largura da captura de vídeo
-    capture.set(CAP_PROP_FRAME_HEIGHT, windowHeight); // Define a altura da captura de vídeo
+    //capture.set(CAP_PROP_FRAME_WIDTH, windowWidth);  // Define a largura da captura de vídeo
+    //capture.set(CAP_PROP_FRAME_HEIGHT, windowHeight); // Define a altura da captura de vídeo
+
+    namedWindow("Snake Game", WINDOW_NORMAL);
 
     ReiniciarGame();
 
@@ -226,6 +282,9 @@ int main(int argc, const char** argv) {
         capture >> frame;
         if (frame.empty())
             break;
+
+        if (key == 0) // just first time
+            resizeWindow("Snake Game", frame.cols, frame.rows);
 
         flip(frame, frame, 1);
 
@@ -238,7 +297,7 @@ int main(int argc, const char** argv) {
 
         if (!faces.empty()) {
             // Usa o centro do primeiro rosto detectado como a posição da cobra
-            Point faceCenter(faces[0].x + faces[0].width / 4, faces[0].y + faces[0].height / 4);
+            Point faceCenter(faces[0].x + faces[0].width /4, faces[0].y + faces[0].height/ 4);
             updateGame(faceCenter);
         }
 
@@ -247,6 +306,7 @@ int main(int argc, const char** argv) {
 
         // Copia a imagem de fundo para exibição
         Mat displayFrame = background.clone();
+        //Mat displayFrame = background;
 
         // Desenha a "cobra" (imagem da cabeça), a comida e o perseguidor no plano de fundo
         drawSnake(displayFrame);
@@ -259,15 +319,16 @@ int main(int argc, const char** argv) {
         // Desenha retângulos ao redor dos rostos detectados
         for (size_t i = 0; i < faces.size(); i++) {
             Rect r = faces[i];
+
             rectangle(frame, Point(cvRound(r.x), cvRound(r.y)),
-                      Point(cvRound((r.x + r.width - 1)), cvRound((r.y + r.height - 1))),
+                      Point(cvRound((r.x + (r.width/1.5) - 1)), cvRound((r.y + (r.height/1.5)- 1))),
                       Scalar(255, 0, 0), 3); // Desenha um retângulo azul
         }
 
         // Exibe o frame com a cobra, comida e perseguidor
         imshow("Snake Game", displayFrame);
 
-        char key = (char)waitKey(30);
+        key = (char)waitKey(30);
         if (key == 27) {  // ESC para sair
             Arquivo(pontuacao);
             break;
