@@ -14,50 +14,74 @@
 
 using namespace std;
 using namespace cv;
+using namespace std::chrono;
+
+// Variável para armazenar o tempo inicial do jogo
+steady_clock::time_point startTime;
+
 
 bool jaSalvo = false;
 int blockSize= 20;  // estava 20 o tamanho;
 int pontuacao = 0;
 Mat cobrinha;     // imagem da cobrinha
-Mat background;   // Plano de fundo
-Mat comidaImage;  //Imagem de comida
-Mat comidaImage2;
-Mat chaser;  // Imagem da comida2
+Mat background;   // imagem do plano de fundo
+Mat comidaImage;  //imagem do ovo
+Mat comidaImage2; // imagem da comida 2
+Mat chaser;  // Imagem do sasuke
 char key = 0;
+int tempoLimite = 40;
 
 // Posição da "cobrinha" e da comida
 Point snakePos(100, 100);
 Point comida; //
 Point comida2; // posição da comida
 Point chaserPos(20, 20); // Posição inicial do perseguidor
-int chaserSpeed = 3; // Velocidade do perseguidor
+int chaserSpeed = 1; // Velocidade do perseguidor
 
 // Função para salvar a pontuação
-void Arquivo(int pontuacao) {
-    fstream file;
-    int maiorPontuacao = 0;
+class Pontuacao {
+private:
+    int maiorPontuacao;
+    string nomeArquivo;
 
-    // Abre o arquivo e lê a maior pontuação existente
-    file.open("tabela_de_pontuacoes.txt", ios::in);
-    if (file.is_open()) {
-        file >> maiorPontuacao;  // Lê a maior pontuação do arquivo
-        file.close();
-    }
-
-    // Se a pontuação atual for maior que a salva, atualiza o arquivo
-    if (pontuacao > maiorPontuacao) {
-        file.open("tabela_de_pontuacoes.txt", ios::out);  // Abre o arquivo para escrita
-        if (!file) {
-            cout << "Erro ao abrir o arquivo para salvar a pontuação." << endl;
-        } else {
-            file << pontuacao;  // Salva a nova maior pontuação
-            cout << "Nova maior pontuação salva: " << pontuacao << endl;
+public:
+    // Construtor da classe que recebe o nome do arquivo como parâmetro
+    Pontuacao(const string& arquivo) : nomeArquivo(arquivo), maiorPontuacao(0) {
+        // Carrega a maior pontuação do arquivo, se ele existir
+        ifstream file(nomeArquivo);
+        if (file.is_open()) {
+            file >> maiorPontuacao;  // Lê a maior pontuação do arquivo
             file.close();
         }
-    } else {
-        cout << "A pontuação atual não é maior que a salva: " << maiorPontuacao << endl;
     }
-}
+
+    // Função para verificar e atualizar a pontuação
+    void verificarPontuacao(int pontuacaoAtual) {
+        if (pontuacaoAtual > maiorPontuacao) {
+            maiorPontuacao = pontuacaoAtual;
+            salvarPontuacao();  // Salva a nova pontuação no arquivo
+            cout << "Nova maior pontuação salva: " << maiorPontuacao << endl;
+        } else {
+            cout << "A pontuação atual não é maior que a salva: " << maiorPontuacao << endl;
+        }
+    }
+
+    // Função para salvar a maior pontuação no arquivo
+    void salvarPontuacao() {
+        ofstream file(nomeArquivo);
+        if (file.is_open()) {
+            file << maiorPontuacao;  // Salva a nova maior pontuação
+            file.close();
+        } else {
+            cout << "Erro ao abrir o arquivo para salvar a pontuação." << endl;
+        }
+    }
+
+    // Função para retornar a maior pontuação
+    int getMaiorPontuacao() const {
+        return maiorPontuacao;
+    }
+};
 
 // Função para reiniciar o jogo
 void ReiniciarGame() {
@@ -66,6 +90,8 @@ void ReiniciarGame() {
     comida = Point(rand() % 30 * blockSize, rand() % 20 * blockSize);  // Gera a posição da primeira comida
     comida2 = Point(rand() % 30 * blockSize, rand() % 20 * blockSize); // Gera a posição da segunda comida
     chaserPos = Point(20, 20); // Reinicia a posição do perseguidor
+    // Reinicia o tempo do jogo
+    startTime = steady_clock::now();
 }
 
 // Desenha a comida com uma imagem PNG
@@ -126,8 +152,7 @@ void drawSnake(Mat& frame) {
     }
 }
 
-// Função para desenhar o perseguidor
-//void drawChaser(Mat& frame) {
+
     // Função para desenhar o perseguidor com imagem PNG
 void drawChaser(Mat& frame) {
     if (!chaser.empty()) {
@@ -150,29 +175,6 @@ void drawChaser(Mat& frame) {
 }
 
 
-    
-
-   /* if(!chaser.empty())
-    Mat mask, chaserResized;
-    int chaserSize = blockSize * 4;
-    resize(chaser, chaserResized, Size(chaserSize,  chaserSize));
-    vector<Mat> layers;
-    split(chaserResized, layers);
-    if(layers.size() == 4){
-        Mat rgb[3] ={layers[0], layers[1], layers[2]};
-        mask =layers[3];
-        merge(rgb, 3, chaserResized);
-        chaserResized.copyTo(frame(Rect(chaserPos.x, chaserPos.y, chaserResized.cols, chaserResized.rows)), mask);
-    }else {
-        chaserResized.copyTo(frame(Rect(chaserPos.x, chaserPos.y, chaserResized.cols, chaserResized.rows)));
-    }
-    */
-    
-    //Scalar chaserColor(0, 0, 255); // Cor vermelha para o perseguidor
-    //Point chaserTopLeft(chaserPos.x, chaserPos.y);
-    //Point chaserBottomRight(chaserPos.x + blockSize, chaserPos.y + blockSize);
-    //rectangle(frame, chaserTopLeft, chaserBottomRight, chaserColor, -1); // Desenha o perseguidor
-//}
 
 // Atualiza a posição da cobra com base na detecção do rosto
 void updateGame(Point faceCenter) {
@@ -210,7 +212,8 @@ void updateChaser() {
     // Verifica se o perseguidor alcançou a cobrinha  
            if (abs(chaserPos.x - snakePos.x) < blockSize * 1.5 && abs(chaserPos.y - snakePos.y) < blockSize * 1.5 ) {
         cout << "Game Over! O perseguidor alcançou a cobrinha." << endl;
-        Arquivo(pontuacao); // Salva a pontuação
+        Pontuacao pontuacaoManager("tabela_de_pontuacoes.txt2");
+         pontuacaoManager.verificarPontuacao(pontuacao); // Salva a pontuação
         exit(0); // Encerra o jogo
     }
 
@@ -222,6 +225,11 @@ int main(int argc, const char** argv) {
     Mat frame;
     CascadeClassifier faceCascade;
     string faceCascadeName = "haarcascade_frontalface_default.xml";
+
+    // Inicializa o tempo do jogo
+    startTime = steady_clock::now();
+    //inicializa o arquivo
+     Pontuacao pontuacaoManager("tabela_de_pontuacoes.txt2");
 
     // Carrega a imagem do perseguidor
     chaser = imread("chaser.png", IMREAD_UNCHANGED);
@@ -315,6 +323,24 @@ int main(int argc, const char** argv) {
 
         // Exibe o placar
         putText(displayFrame, "Placar: " + to_string(pontuacao), Point(430,470 ), FONT_HERSHEY_SIMPLEX, 1, Scalar(128, 0, 128), 2);
+        // Calcula o tempo de jogo
+        steady_clock::time_point currentTime = steady_clock::now();
+        duration<double> elapsedTime = duration_cast<duration<double>>(currentTime - startTime);
+
+        // Calcula o tempo restante
+        int tempoRestante = tempoLimite - (int)elapsedTime.count();
+
+        // Exibe o tempo de jogo decorrido
+        putText(displayFrame, "Tempo: " + to_string(tempoRestante) + "s", Point(30, 470), FONT_HERSHEY_SIMPLEX, 1, Scalar(0, 0, 255), 2);
+        // Verifica se o tempo limite foi atingido
+        if (tempoRestante <= 0) {
+            cout <<"  Tempo limite atingido! Game Over " << endl;
+            putText(displayFrame, " Game Over ", Point(150, 240), FONT_HERSHEY_SIMPLEX, 1.5, Scalar(255, 0, 0), 3);
+            imshow("Snake Game", displayFrame);
+            waitKey(3000);  // Exibe a mensagem por 3 segundos
+             pontuacaoManager.verificarPontuacao(pontuacao);  // Salva a pontuação
+            break;  // Sai do loop do jogo
+        }
 
         // Desenha retângulos ao redor dos rostos detectados
         for (size_t i = 0; i < faces.size(); i++) {
@@ -330,7 +356,7 @@ int main(int argc, const char** argv) {
 
         key = (char)waitKey(30);
         if (key == 27) {  // ESC para sair
-            Arquivo(pontuacao);
+             pontuacaoManager.verificarPontuacao(pontuacao);
             break;
         }
     }
