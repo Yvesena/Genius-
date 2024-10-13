@@ -11,6 +11,7 @@
 #include <string>
 #include <locale>
 #include <bits/stdc++.h>
+#include <cstdlib>  // Para a função system()
 
 using namespace std;
 using namespace cv;
@@ -18,6 +19,26 @@ using namespace std::chrono;
 
 // Variável para armazenar o tempo inicial do jogo
 steady_clock::time_point startTime;
+
+
+// Função para tocar o efeito sonoro
+void tocarEfeitoSonoro() {
+    // Caminho para o arquivo .mp3 com espaços
+    string caminhoDoArquivo = "./Efeito_Chidori.mp3";
+
+    // Executa o mpg123 para tocar o som, incluindo o caminho entre aspas
+    string comando = "mpg123 \"" + caminhoDoArquivo + "\"";
+    system(comando.c_str());
+}
+void EfeitoSonoro2() {
+    // Caminho para o arquivo .mp3 com espaços
+    string caminhoDoArquivo2 = "./Comer.mp3";
+
+    // Executa o mpg123 para tocar o som, incluindo o caminho entre aspas
+    string comando = "mpg123 \"" + caminhoDoArquivo2 + "\"";
+    system(comando.c_str());
+}
+
 
 
 bool jaSalvo = false;
@@ -184,18 +205,20 @@ void updateGame(Point faceCenter) {
     // Verifica se comeu a primeira comida
     if (abs(snakePos.x - comida.x) < blockSize * 3 && abs(snakePos.y - comida.y) < blockSize * 3) {
         pontuacao += 10;
+        EfeitoSonoro2();
         comida = Point(rand() % 30 * blockSize, rand() % 20 * blockSize); // Gera nova posição para a primeira comida
     }
 
     // Verifica se comeu a segunda comida
     if (abs(snakePos.x - comida2.x) < blockSize * 3 && abs(snakePos.y - comida2.y) < blockSize * 3) {
         pontuacao += 10;
+        EfeitoSonoro2();
         comida2 = Point(rand() % 30 * blockSize, rand() % 20 * blockSize); // Gera nova posição para a segunda comida
     }
 }
 
 // Atualiza a posição do perseguidor
-void updateChaser() {
+bool updateChaser() {
     // Move o perseguidor em direção à cobra
     if (chaserPos.x < snakePos.x) {
         chaserPos.x += chaserSpeed; // Move para a direita
@@ -208,14 +231,19 @@ void updateChaser() {
     } else if (chaserPos.y > snakePos.y) {
         chaserPos.y -= chaserSpeed; // Move para cima
     }
-
+  Mat displayFrame = background.clone();
     // Verifica se o perseguidor alcançou a cobrinha  
            if (abs(chaserPos.x - snakePos.x) < blockSize * 1.5 && abs(chaserPos.y - snakePos.y) < blockSize * 1.5 ) {
-        cout << "Game Over! O perseguidor alcançou a cobrinha." << endl;
+            putText(displayFrame, " Game Over!! ", Point(150, 240), FONT_HERSHEY_SIMPLEX, 1.5, Scalar(255, 255, 255), 3);
+            
+        
+         tocarEfeitoSonoro();
+         
+         cout << "Game Over! O Sasuke alcançou o Itachi." << endl;
         Pontuacao pontuacaoManager("tabela_de_pontuacoes.txt2");
          pontuacaoManager.verificarPontuacao(pontuacao); // Salva a pontuação
-        exit(0); // Encerra o jogo
-    }
+        return true; 
+    }return false;
 
 }
 
@@ -310,7 +338,7 @@ int main(int argc, const char** argv) {
         }
 
         // Atualiza a posição do perseguidor
-        updateChaser();
+        //updateChaser();
 
         // Copia a imagem de fundo para exibição
         Mat displayFrame = background.clone();
@@ -322,7 +350,7 @@ int main(int argc, const char** argv) {
         drawChaser(displayFrame);
 
         // Exibe o placar
-        putText(displayFrame, "Placar: " + to_string(pontuacao), Point(430,470 ), FONT_HERSHEY_SIMPLEX, 1, Scalar(128, 0, 128), 2);
+        putText(displayFrame, "Placar: " + to_string(pontuacao), Point(430,470 ), FONT_HERSHEY_SIMPLEX, 1, Scalar(255, 255, 255), 2);
         // Calcula o tempo de jogo
         steady_clock::time_point currentTime = steady_clock::now();
         duration<double> elapsedTime = duration_cast<duration<double>>(currentTime - startTime);
@@ -331,14 +359,27 @@ int main(int argc, const char** argv) {
         int tempoRestante = tempoLimite - (int)elapsedTime.count();
 
         // Exibe o tempo de jogo decorrido
-        putText(displayFrame, "Tempo: " + to_string(tempoRestante) + "s", Point(30, 470), FONT_HERSHEY_SIMPLEX, 1, Scalar(0, 0, 255), 2);
+        putText(displayFrame, "Tempo: " + to_string(tempoRestante) + "s", Point(30, 470), FONT_HERSHEY_SIMPLEX, 1, Scalar(255, 255, 255), 2);
         // Verifica se o tempo limite foi atingido
         if (tempoRestante <= 0) {
-            cout <<"  Tempo limite atingido! Game Over " << endl;
-            putText(displayFrame, " Game Over ", Point(150, 240), FONT_HERSHEY_SIMPLEX, 1.5, Scalar(255, 0, 0), 3);
+            cout <<"  Tempo limite atingido! Game Over!! " << endl;
+            putText(displayFrame, " Game Over!! ", Point(150, 240), FONT_HERSHEY_SIMPLEX, 1.5, Scalar(255, 255, 255), 3);
             imshow("Snake Game", displayFrame);
             waitKey(3000);  // Exibe a mensagem por 3 segundos
              pontuacaoManager.verificarPontuacao(pontuacao);  // Salva a pontuação
+            break;  // Sai do loop do jogo
+        }
+        if (updateChaser()) {
+            // Copia a imagem de fundo para exibição
+            Mat displayFrame = background.clone();
+            // Desenha a "cobra" (imagem da cabeça), a comida e o perseguidor no plano de fundo
+            drawSnake(displayFrame);
+            drawFood(displayFrame);
+            drawChaser(displayFrame);
+            // Exibe a mensagem de Game Over
+            putText(displayFrame, " Game Over!! ", Point(150, 240), FONT_HERSHEY_SIMPLEX, 1.5, Scalar(255, 255, 255), 3);
+            imshow("Snake Game", displayFrame);
+            waitKey(3000);  // Exibe a mensagem por 3 segundos
             break;  // Sai do loop do jogo
         }
 
